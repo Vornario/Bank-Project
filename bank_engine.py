@@ -14,4 +14,4 @@ class Bank:
     def auth_user(self, mail, password):
         for user in self.users:
             if user.mail == mail and User.authenticate(password):
-                return user
+                return user #test
