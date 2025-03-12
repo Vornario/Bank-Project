@@ -20,7 +20,7 @@ class Bank:
 
     def auth_user(self, mail, password):
         for user in self.users:
-            if user.mail == mail and user.authenticate(password):
+            if user.email == mail and user.authenticate(password):
                 return user
         self.error_handler.add_error("Ошибка аутентификации: неверный логин или пароль")
         return None
