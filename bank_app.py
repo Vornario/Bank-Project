@@ -1,121 +1,5 @@
 import customtkinter as ctk
 from tkinter import messagebox
-from bank_engine import Bank
-
-
-ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("blue")
-
-
-bank = Bank()
-current_user = None
-
-
-def register_user():
-    name = entry_name.get()
-    mail = entry_mail.get()
-    password = entry_password.get()
-    if name and mail and password:
-        bank.reg_user(name, mail, password)
-        messagebox.showinfo("Успех", "Пользователь успешно зарегистрирован!")
-    else:
-        messagebox.showerror("Ошибка", "Заполните все поля!")
-
-
-def authenticate_user():
-    global current_user
-    mail = entry_auth_mail.get()
-    password = entry_auth_password.get()
-    if mail and password:
-        user = bank.auth_user(mail, password)
-        if user:
-            current_user = user
-            messagebox.showinfo("Успех", f"Добро пожаловать, {user.name}!")
-        else:
-            messagebox.showerror("Ошибка", "Неверный логин или пароль!")
-    else:
-        messagebox.showerror("Ошибка", "Заполните все поля!")
-
-
-def create_account():
-    if current_user:
-        account = bank.create_account(current_user.user_id, "RUB")
-        if account:
-            messagebox.showinfo("Успех", f"Счет {account.account_id} создан!")
-        else:
-            messagebox.showerror("Ошибка", "Не удалось создать счет!")
-    else:
-        messagebox.showerror("Ошибка", "Пользователь не авторизован!")
-
-
-def deposit():
-    account_id = get_account_id()
-    amount = get_amount("Введите сумму для пополнения:")
-    if account_id and amount:
-        if bank.deposit(account_id, amount):
-            messagebox.showinfo("Успех", "Счет успешно пополнен!")
-        else:
-            messagebox.showerror("Ошибка", "Не удалось пополнить счет!")
-
-
-def withdraw():
-    account_id = get_account_id()
-    amount = get_amount("Введите сумму для снятия:")
-    if account_id and amount:
-        if bank.withdraw(account_id, amount):
-            messagebox.showinfo("Успех", "Средства успешно сняты!")
-        else:
-            messagebox.showerror("Ошибка", "Не удалось снять средства!")
-
-
-def transfer():
-    from_account_id = get_account_id("Введите ID счета отправителя:")
-    to_account_id = get_account_id("Введите ID счета получателя:")
-    amount = get_amount("Введите сумму для перевода:")
-    if from_account_id and to_account_id and amount:
-        if bank.transfer(from_account_id, to_account_id, amount):
-            messagebox.showinfo("Успех", "Перевод выполнен успешно!")
-        else:
-            messagebox.showerror("Ошибка", "Не удалось выполнить перевод!")
-
-
-def get_balance():
-    account_id = get_account_id()
-    if account_id:
-        balance = bank.get_balance(account_id)
-        if balance is not None:
-            messagebox.showinfo("Баланс", f"Ваш баланс: {balance}")
-        else:
-            messagebox.showerror("Ошибка", "Не удалось получить баланс!")
-
-
-def get_account_id(prompt="Введите ID счета:"):
-    return get_input(prompt)
-
-
-def get_amount(prompt):
-    return get_input(prompt, is_numeric=True)
-
-
-def get_input(prompt, is_numeric=False):
-    dialog = ctk.CTkInputDialog(text=prompt, title="Ввод данных")
-    user_input = dialog.get_input()
-    if user_input:
-        if is_numeric:
-            try:
-                return float(user_input)
-            except ValueError:
-                messagebox.showerror("Ошибка", "Введите число!")
-                return None
-        return user_input
-    return None
-
-
-import customtkinter as ctk
-from tkinter import messagebox
-
-ctk.set_appearance_mode("light")
-ctk.set_default_color_theme("green")
 
 
 class BankingApp:
@@ -131,6 +15,7 @@ class BankingApp:
         self.button_hover_color = "#6B6B63"
 
         self.users = {}
+        self.current_user = None
 
         self.container = ctk.CTkFrame(self.app, fg_color="#FFFFF1")
         self.container.pack(fill="both", expand=True)
@@ -141,16 +26,16 @@ class BankingApp:
         self.login_frame = ctk.CTkFrame(self.container, fg_color="#FFFFF1")
         self.main_menu_frame = ctk.CTkFrame(self.container, fg_color="#FFFFF1")
 
-        self.create_register_frame()
-        self.create_login_frame()
-        self.create_main_menu_frame()
+        self._create_register_frame()
+        self._create_login_frame()
+        self._create_main_menu_frame()
 
-        self.show_frame("register")
+        self._show_frame("register")
 
         self.app.mainloop()
 
-    def show_frame(self, page_name):
-        """Показывает указанный фрейм"""
+    def _show_frame(self, page_name):
+        """Переключение между фреймами"""
         self.register_frame.grid_forget()
         self.login_frame.grid_forget()
         self.main_menu_frame.grid_forget()
@@ -162,8 +47,8 @@ class BankingApp:
         elif page_name == "main":
             self.main_menu_frame.grid(row=0, column=0, sticky="nsew")
 
-    def create_register_frame(self):
-        """Создает фрейм регистрации"""
+    def _create_register_frame(self):
+        """Фрейм регистрации"""
         center_frame = ctk.CTkFrame(self.register_frame, fg_color="#FFFFF1")
         center_frame.pack(expand=True, fill="both", padx=50, pady=20)
 
@@ -185,33 +70,29 @@ class BankingApp:
         )
         self.reg_password.pack(pady=5, fill="x")
 
-        button_register = ctk.CTkButton(
+        ctk.CTkButton(
             center_frame,
             text="Зарегистрироваться",
             font=self.font_style,
             fg_color=self.button_color,
             hover_color=self.button_hover_color,
-            command=self.register_user,
-        )
-        button_register.pack(pady=20, fill="x")
+            command=self._register_user,
+        ).pack(pady=20, fill="x")
 
-        label_have_account = ctk.CTkLabel(
-            center_frame, text="Уже есть аккаунт?", font=self.font_style
+        ctk.CTkLabel(center_frame, text="Уже есть аккаунт?", font=self.font_style).pack(
+            pady=5
         )
-        label_have_account.pack(pady=5)
-
-        button_to_login = ctk.CTkButton(
+        ctk.CTkButton(
             center_frame,
             text="Войти",
             font=self.font_style,
             fg_color="gray",
             hover_color="darkgray",
-            command=lambda: self.show_frame("login"),
-        )
-        button_to_login.pack(pady=5, fill="x")
+            command=lambda: self._show_frame("login"),
+        ).pack(pady=5, fill="x")
 
-    def create_login_frame(self):
-        """Создает фрейм входа"""
+    def _create_login_frame(self):
+        """Фрейм входа"""
         center_frame = ctk.CTkFrame(self.login_frame, fg_color="#FFFFF1")
         center_frame.pack(expand=True, fill="both", padx=50, pady=20)
 
@@ -228,106 +109,69 @@ class BankingApp:
         )
         self.login_password.pack(pady=5, fill="x")
 
-        button_login = ctk.CTkButton(
+        ctk.CTkButton(
             center_frame,
             text="Войти",
             font=self.font_style,
             fg_color=self.button_color,
             hover_color=self.button_hover_color,
-            command=self.login_user,
-        )
-        button_login.pack(pady=20, fill="x")
+            command=self._login_user,
+        ).pack(pady=20, fill="x")
 
-        label_no_account = ctk.CTkLabel(
-            center_frame, text="Нет аккаунта?", font=self.font_style
+        ctk.CTkLabel(center_frame, text="Нет аккаунта?", font=self.font_style).pack(
+            pady=5
         )
-        label_no_account.pack(pady=5)
-
-        button_to_register = ctk.CTkButton(
+        ctk.CTkButton(
             center_frame,
             text="Зарегистрироваться",
             font=self.font_style,
             fg_color="gray",
             hover_color="darkgray",
-            command=lambda: self.show_frame("register"),
-        )
-        button_to_register.pack(pady=5, fill="x")
+            command=lambda: self._show_frame("register"),
+        ).pack(pady=5, fill="x")
 
-    def create_main_menu_frame(self):
-        """Создает главное меню"""
+    def _create_main_menu_frame(self):
+        """Главное меню"""
         center_frame = ctk.CTkFrame(self.main_menu_frame, fg_color="#FFFFF1")
         center_frame.pack(expand=True, fill="both", padx=50, pady=20)
 
         label = ctk.CTkLabel(center_frame, text="Главное меню", font=self.title_font)
         label.pack(pady=(0, 20))
 
-        button_create_account = ctk.CTkButton(
-            center_frame,
-            text="Создать счет",
-            font=self.font_style,
-            fg_color=self.button_color,
-            hover_color=self.button_hover_color,
-            command=self.create_account,
-        )
-        button_create_account.pack(pady=5, fill="x")
+        operations = [
+            ("Создать счет", self._create_account),
+            ("Пополнить счет", self._deposit),
+            ("Снять средства", self._withdraw),
+            ("Перевести средства", self._transfer),
+            ("Просмотреть баланс", self._get_balance),
+        ]
 
-        button_deposit = ctk.CTkButton(
-            center_frame,
-            text="Пополнить счет",
-            font=self.font_style,
-            fg_color=self.button_color,
-            hover_color=self.button_hover_color,
-            command=self.deposit,
-        )
-        button_deposit.pack(pady=5, fill="x")
+        for text, command in operations:
+            ctk.CTkButton(
+                center_frame,
+                text=text,
+                font=self.font_style,
+                fg_color=self.button_color,
+                hover_color=self.button_hover_color,
+                command=command,
+            ).pack(pady=5, fill="x")
 
-        button_withdraw = ctk.CTkButton(
-            center_frame,
-            text="Снять средства",
-            font=self.font_style,
-            fg_color=self.button_color,
-            hover_color=self.button_hover_color,
-            command=self.withdraw,
-        )
-        button_withdraw.pack(pady=5, fill="x")
-
-        button_transfer = ctk.CTkButton(
-            center_frame,
-            text="Перевести средства",
-            font=self.font_style,
-            fg_color=self.button_color,
-            hover_color=self.button_hover_color,
-            command=self.transfer,
-        )
-        button_transfer.pack(pady=5, fill="x")
-
-        button_balance = ctk.CTkButton(
-            center_frame,
-            text="Просмотреть баланс",
-            font=self.font_style,
-            fg_color=self.button_color,
-            hover_color=self.button_hover_color,
-            command=self.get_balance,
-        )
-        button_balance.pack(pady=5, fill="x")
-
-        button_logout = ctk.CTkButton(
+        ctk.CTkButton(
             center_frame,
             text="Выйти",
             font=self.font_style,
             fg_color="gray",
             hover_color="darkgray",
-            command=lambda: self.show_frame("login"),
-        )
-        button_logout.pack(pady=20, fill="x")
+            command=self._logout,
+        ).pack(pady=20, fill="x")
 
-    def register_user(self):
-        """Регистрация нового пользователя"""
-        name = self.reg_name.get()
-        email = self.reg_email.get()
-        password = self.reg_password.get()
+    def _register_user(self):
+        """Регистрация пользователя"""
+        name = self.reg_name.get().strip()
+        email = self.reg_email.get().strip()
+        password = self.reg_password.get().strip()
 
-        if not name or not email or not password:
+        if not all([name, email, password]):
             messagebox.showerror("Ошибка", "Все поля должны быть заполнены!")
             return
 
@@ -339,25 +183,21 @@ class BankingApp:
 
         self.users[email] = {"name": name, "password": password, "accounts": []}
 
-        messagebox.showinfo(
-            "Успех", "Регистрация прошла успешно! Теперь вы можете войти."
-        )
-        self.show_frame("login")
-        self.reg_name.delete(0, "end")
-        self.reg_email.delete(0, "end")
-        self.reg_password.delete(0, "end")
+        messagebox.showinfo("Успех", "Регистрация прошла успешно!")
+        self._clear_register_fields()
+        self._show_frame("login")
 
-    def login_user(self):
-        """Вход пользователя"""
-        email = self.login_email.get()
-        password = self.login_password.get()
+    def _login_user(self):
+        """Авторизация пользователя"""
+        email = self.login_email.get().strip()
+        password = self.login_password.get().strip()
 
-        if not email or not password:
+        if not all([email, password]):
             messagebox.showerror("Ошибка", "Все поля должны быть заполнены!")
             return
 
         if email not in self.users:
-            messagebox.showerror("Ошибка", "Пользователь с такой почтой не найден!")
+            messagebox.showerror("Ошибка", "Пользователь не найден!")
             return
 
         if self.users[email]["password"] != password:
@@ -366,58 +206,168 @@ class BankingApp:
 
         self.current_user = email
         messagebox.showinfo("Успех", f"Добро пожаловать, {self.users[email]['name']}!")
-        self.show_frame("main")
-        self.login_email.delete(0, "end")
-        self.login_password.delete(0, "end")
+        self._clear_login_fields()
+        self._show_frame("main")
 
-    def create_account(self):
+    def _create_account(self):
         """Создание счета"""
-        if not hasattr(self, "current_user"):
+        if not self.current_user:
+            messagebox.showerror("Ошибка", "Необходимо авторизоваться!")
             return
 
         account_id = f"ACC-{len(self.users[self.current_user]['accounts']) + 1:04d}"
         self.users[self.current_user]["accounts"].append(
-            {"id": account_id, "balance": 0}
+            {"id": account_id, "balance": 0.0}
         )
 
         messagebox.showinfo("Успех", f"Счет {account_id} успешно создан!")
 
-    def deposit(self):
+    def _deposit(self):
         """Пополнение счета"""
-        if not hasattr(self, "current_user"):
+        if not self._check_auth():
             return
 
-        messagebox.showinfo("Информация", "Функция пополнения счета в разработке")
+        account_id = self._get_account_id("Введите ID счета для пополнения:")
+        if not account_id:
+            return
 
-    def withdraw(self):
+        amount = self._get_amount("Введите сумму для пополнения:")
+        if amount is None:
+            return
+
+        for account in self.users[self.current_user]["accounts"]:
+            if account["id"] == account_id:
+                account["balance"] += amount
+                messagebox.showinfo(
+                    "Успех", f"Счет {account_id} пополнен на {amount} руб."
+                )
+                return
+
+        messagebox.showerror("Ошибка", "Счет не найден!")
+
+    def _withdraw(self):
         """Снятие средств"""
-        if not hasattr(self, "current_user"):
+        if not self._check_auth():
             return
 
-        messagebox.showinfo("Информация", "Функция снятия средств в разработке")
+        account_id = self._get_account_id("Введите ID счета для снятия:")
+        if not account_id:
+            return
 
-    def transfer(self):
+        amount = self._get_amount("Введите сумму для снятия:")
+        if amount is None:
+            return
+        for account in self.users[self.current_user]["accounts"]:
+            if account["id"] == account_id:
+                if account["balance"] >= amount:
+                    account["balance"] -= amount
+                    messagebox.showinfo(
+                        "Успех", f"Со счета {account_id} снято {amount} руб."
+                    )
+                else:
+                    messagebox.showerror("Ошибка", "Недостаточно средств!")
+                return
+
+        messagebox.showerror("Ошибка", "Счет не найден!")
+
+    def _transfer(self):
         """Перевод средств"""
-        if not hasattr(self, "current_user"):
+        if not self._check_auth():
             return
 
-        messagebox.showinfo("Информация", "Функция перевода средств в разработке")
+        from_account = self._get_account_id("Введите ID вашего счета:")
+        if not from_account:
+            return
 
-    def get_balance(self):
+        to_account = self._get_account_id("Введите ID счета получателя:")
+        if not to_account:
+            return
+
+        amount = self._get_amount("Введите сумму для перевода:")
+        if amount is None:
+            return
+
+        sender_account = None
+        for account in self.users[self.current_user]["accounts"]:
+            if account["id"] == from_account:
+                sender_account = account
+                break
+
+        if not sender_account:
+            messagebox.showerror("Ошибка", "Ваш счет не найден!")
+            return
+
+        if sender_account["balance"] < amount:
+            messagebox.showerror("Ошибка", "Недостаточно средств!")
+            return
+
+        recipient_found = False
+        for user in self.users.values():
+            for account in user["accounts"]:
+                if account["id"] == to_account:
+                    account["balance"] += amount
+                    sender_account["balance"] -= amount
+                    messagebox.showinfo(
+                        "Успех", f"Перевод {amount} руб. на счет {to_account} выполнен!"
+                    )
+                    return
+
+        messagebox.showerror("Ошибка", "Счет получателя не найден!")
+
+    def _get_balance(self):
         """Просмотр баланса"""
-        if not hasattr(self, "current_user"):
+        if not self._check_auth():
             return
 
         accounts = self.users[self.current_user]["accounts"]
         if not accounts:
-            messagebox.showinfo("Баланс", "У вас нет открытых счетов")
+            messagebox.showinfo("Информация", "У вас нет открытых счетов")
             return
 
         balance_info = "\n".join(
-            [f"Счет {acc['id']}: {acc['balance']} руб." for acc in accounts]
+            [f"Счет {acc['id']}: {acc['balance']:.2f} руб." for acc in accounts]
         )
         messagebox.showinfo("Ваши счета", balance_info)
 
+    def _logout(self):
+        """Выход из системы"""
+        self.current_user = None
+        self._show_frame("login")
+
+    def _check_auth(self):
+        """Проверка авторизации"""
+        if not self.current_user:
+            messagebox.showerror("Ошибка", "Необходимо авторизоваться!")
+            return False
+        return True
+
+    def _get_account_id(self, prompt):
+        """Получение ID счета"""
+        dialog = ctk.CTkInputDialog(text=prompt, title="Ввод данных")
+        return dialog.get_input()
+
+    def _get_amount(self, prompt):
+        """Получение суммы"""
+        dialog = ctk.CTkInputDialog(text=prompt, title="Ввод суммы")
+        try:
+            return float(dialog.get_input())
+        except (ValueError, TypeError):
+            messagebox.showerror("Ошибка", "Введите корректную сумму!")
+            return None
+
+    def _clear_register_fields(self):
+        """Очистка полей регистрации"""
+        self.reg_name.delete(0, "end")
+        self.reg_email.delete(0, "end")
+        self.reg_password.delete(0, "end")
+
+    def _clear_login_fields(self):
+        """Очистка полей входа"""
+        self.login_email.delete(0, "end")
+        self.login_password.delete(0, "end")
+
 
 if __name__ == "__main__":
+    ctk.set_appearance_mode("light")
+    ctk.set_default_color_theme("green")
     BankingApp()
