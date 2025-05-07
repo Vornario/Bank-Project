@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from tkinter import messagebox
+from bank_engine import Bank
 
 
 class BankingApp:
@@ -14,8 +15,8 @@ class BankingApp:
         self.button_color = "#8B8B83"
         self.button_hover_color = "#6B6B63"
 
-        self.users = {}
         self.current_user = None
+        self.bank = Bank()
 
         self.container = ctk.CTkFrame(self.app, fg_color="#FFFFF1")
         self.container.pack(fill="both", expand=True)
@@ -144,6 +145,8 @@ class BankingApp:
             ("Снять средства", self._withdraw),
             ("Перевести средства", self._transfer),
             ("Просмотреть баланс", self._get_balance),
+            ("Установить лимиты", self._set_limits),
+            ("Просмотреть лимиты", self._view_limits),
         ]
 
         for text, command in operations:
@@ -175,17 +178,19 @@ class BankingApp:
             messagebox.showerror("Ошибка", "Все поля должны быть заполнены!")
             return
 
-        if email in self.users:
+        # Проверяем, есть ли уже пользователь с такой почтой
+        if any(user.email == email for user in self.bank.users):
             messagebox.showerror(
                 "Ошибка", "Пользователь с такой почтой уже существует!"
             )
             return
 
-        self.users[email] = {"name": name, "password": password, "accounts": []}
-
-        messagebox.showinfo("Успех", "Регистрация прошла успешно!")
-        self._clear_register_fields()
-        self._show_frame("login")
+        # Регистрируем пользователя через банковскую систему
+        new_user = self.bank.reg_user(name, email, password)
+        if new_user:
+            messagebox.showinfo("Успех", "Регистрация прошла успешно!")
+            self._clear_register_fields()
+            self._show_frame("login")
 
     def _login_user(self):
         """Авторизация пользователя"""
@@ -196,31 +201,27 @@ class BankingApp:
             messagebox.showerror("Ошибка", "Все поля должны быть заполнены!")
             return
 
-        if email not in self.users:
-            messagebox.showerror("Ошибка", "Пользователь не найден!")
-            return
-
-        if self.users[email]["password"] != password:
-            messagebox.showerror("Ошибка", "Неверный пароль!")
-            return
-
-        self.current_user = email
-        messagebox.showinfo("Успех", f"Добро пожаловать, {self.users[email]['name']}!")
-        self._clear_login_fields()
-        self._show_frame("main")
+        # Аутентифицируем пользователя через банковскую систему
+        user = self.bank.auth_user(email, password)
+        if user:
+            self.current_user = user
+            messagebox.showinfo("Успех", f"Добро пожаловать, {user.name}!")
+            self._clear_login_fields()
+            self._show_frame("main")
+        else:
+            messagebox.showerror("Ошибка", "Неверный email или пароль!")
 
     def _create_account(self):
         """Создание счета"""
-        if not self.current_user:
-            messagebox.showerror("Ошибка", "Необходимо авторизоваться!")
+        if not self._check_auth():
             return
 
-        account_id = f"ACC-{len(self.users[self.current_user]['accounts']) + 1:04d}"
-        self.users[self.current_user]["accounts"].append(
-            {"id": account_id, "balance": 0.0}
-        )
-
-        messagebox.showinfo("Успех", f"Счет {account_id} успешно создан!")
+        # Создаем счет в рублях (код валюты "RUB")
+        account = self.bank.create_account(self.current_user.user_id, "RUB")
+        if account:
+            messagebox.showinfo("Успех", f"Счет {account.account_id} успешно создан!")
+        else:
+            messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
     def _deposit(self):
         """Пополнение счета"""
@@ -231,19 +232,20 @@ class BankingApp:
         if not account_id:
             return
 
+        try:
+            account_id = int(account_id)
+        except ValueError:
+            messagebox.showerror("Ошибка", "ID счета должен быть числом!")
+            return
+
         amount = self._get_amount("Введите сумму для пополнения:")
         if amount is None:
             return
 
-        for account in self.users[self.current_user]["accounts"]:
-            if account["id"] == account_id:
-                account["balance"] += amount
-                messagebox.showinfo(
-                    "Успех", f"Счет {account_id} пополнен на {amount} руб."
-                )
-                return
-
-        messagebox.showerror("Ошибка", "Счет не найден!")
+        if self.bank.deposit(account_id, amount):
+            messagebox.showinfo("Успех", f"Счет {account_id} пополнен на {amount} руб.")
+        else:
+            messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
     def _withdraw(self):
         """Снятие средств"""
@@ -254,21 +256,20 @@ class BankingApp:
         if not account_id:
             return
 
+        try:
+            account_id = int(account_id)
+        except ValueError:
+            messagebox.showerror("Ошибка", "ID счета должен быть числом!")
+            return
+
         amount = self._get_amount("Введите сумму для снятия:")
         if amount is None:
             return
-        for account in self.users[self.current_user]["accounts"]:
-            if account["id"] == account_id:
-                if account["balance"] >= amount:
-                    account["balance"] -= amount
-                    messagebox.showinfo(
-                        "Успех", f"Со счета {account_id} снято {amount} руб."
-                    )
-                else:
-                    messagebox.showerror("Ошибка", "Недостаточно средств!")
-                return
 
-        messagebox.showerror("Ошибка", "Счет не найден!")
+        if self.bank.withdraw(account_id, amount):
+            messagebox.showinfo("Успех", f"Со счета {account_id} снято {amount} руб.")
+        else:
+            messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
     def _transfer(self):
         """Перевод средств"""
@@ -283,49 +284,36 @@ class BankingApp:
         if not to_account:
             return
 
+        try:
+            from_account = int(from_account)
+            to_account = int(to_account)
+        except ValueError:
+            messagebox.showerror("Ошибка", "ID счета должен быть числом!")
+            return
+
         amount = self._get_amount("Введите сумму для перевода:")
         if amount is None:
             return
 
-        sender_account = None
-        for account in self.users[self.current_user]["accounts"]:
-            if account["id"] == from_account:
-                sender_account = account
-                break
-
-        if not sender_account:
-            messagebox.showerror("Ошибка", "Ваш счет не найден!")
-            return
-
-        if sender_account["balance"] < amount:
-            messagebox.showerror("Ошибка", "Недостаточно средств!")
-            return
-
-        recipient_found = False
-        for user in self.users.values():
-            for account in user["accounts"]:
-                if account["id"] == to_account:
-                    account["balance"] += amount
-                    sender_account["balance"] -= amount
-                    messagebox.showinfo(
-                        "Успех", f"Перевод {amount} руб. на счет {to_account} выполнен!"
-                    )
-                    return
-
-        messagebox.showerror("Ошибка", "Счет получателя не найден!")
+        if self.bank.transfer(from_account, to_account, amount):
+            messagebox.showinfo(
+                "Успех", f"Перевод {amount} руб. на счет {to_account} выполнен!"
+            )
+        else:
+            messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
     def _get_balance(self):
         """Просмотр баланса"""
         if not self._check_auth():
             return
 
-        accounts = self.users[self.current_user]["accounts"]
+        accounts = [acc for acc in self.bank.accounts if acc.user_id == self.current_user.user_id]
         if not accounts:
             messagebox.showinfo("Информация", "У вас нет открытых счетов")
             return
 
         balance_info = "\n".join(
-            [f"Счет {acc['id']}: {acc['balance']:.2f} руб." for acc in accounts]
+            [f"Счет {acc.account_id}: {acc.balance:.2f} руб." for acc in accounts]
         )
         messagebox.showinfo("Ваши счета", balance_info)
 
@@ -365,6 +353,126 @@ class BankingApp:
         """Очистка полей входа"""
         self.login_email.delete(0, "end")
         self.login_password.delete(0, "end")
+
+    def _set_limits(self):
+        """Установка лимитов для счета"""
+        if not self._check_auth():
+            return
+
+        account_id = self._get_account_id("Введите ID счета для установки лимитов:")
+        if not account_id:
+            return
+
+        try:
+            account_id = int(account_id)
+        except ValueError:
+            messagebox.showerror("Ошибка", "ID счета должен быть числом!")
+            return
+
+        # Проверяем, что счет принадлежит текущему пользователю
+        account = next(
+            (acc for acc in self.bank.accounts if acc.account_id == account_id), None
+        )
+        if not account or account.user_id != self.current_user.user_id:
+            messagebox.showerror("Ошибка", "Счет не найден или не принадлежит вам!")
+            return
+
+        limit_window = ctk.CTkToplevel(self.app)
+        limit_window.title("Установка лимитов")
+        limit_window.geometry("400x400")
+
+        ctk.CTkLabel(
+            limit_window,
+            text=f"Установка лимитов для счета {account_id}",
+            font=self.title_font,
+        ).pack(pady=10)
+
+        limit_types = [
+            ("daily_withdrawal", "Дневной лимит на снятие"),
+            ("monthly_withdrawal", "Месячный лимит на снятие"),
+            ("daily_transfer", "Дневной лимит на переводы"),
+            ("monthly_transfer", "Месячный лимит на переводы"),
+        ]
+
+        self.limit_entries = {}
+
+        for limit_type, label_text in limit_types:
+            frame = ctk.CTkFrame(limit_window)
+            frame.pack(pady=5, fill="x", padx=20)
+
+            ctk.CTkLabel(frame, text=label_text + ":", width=150).pack(side="left")
+            entry = ctk.CTkEntry(frame)
+            entry.pack(side="right", expand=True, fill="x")
+            self.limit_entries[limit_type] = entry
+
+        ctk.CTkButton(
+            limit_window,
+            text="Установить лимиты",
+            font=self.font_style,
+            fg_color=self.button_color,
+            hover_color=self.button_hover_color,
+            command=lambda: self._apply_limits(account_id, limit_window),
+        ).pack(pady=20)
+
+    def _apply_limits(self, account_id, window):
+        """Применение установленных лимитов"""
+        try:
+            for limit_type, entry in self.limit_entries.items():
+                value = entry.get().strip()
+                if value:
+                    amount = float(value)
+                    if not self.bank.set_limit(account_id, limit_type, amount):
+                        messagebox.showerror(
+                            "Ошибка", self.bank.error_handler.errors[-1]
+                        )
+                        return
+                else:
+                    # Если поле пустое, устанавливаем None (без лимита)
+                    self.bank.set_limit(account_id, limit_type, None)
+
+            messagebox.showinfo("Успех", "Лимиты успешно установлены!")
+            window.destroy()
+        except ValueError:
+            messagebox.showerror("Ошибка", "Введите корректную сумму!")
+
+    def _view_limits(self):
+        """Просмотр установленных лимитов"""
+        if not self._check_auth():
+            return
+
+        account_id = self._get_account_id("Введите ID счета для просмотра лимитов:")
+        if not account_id:
+            return
+
+        try:
+            account_id = int(account_id)
+        except ValueError:
+            messagebox.showerror("Ошибка", "ID счета должен быть числом!")
+            return
+
+        # Проверяем, что счет принадлежит текущему пользователю
+        account = next(
+            (acc for acc in self.bank.accounts if acc.account_id == account_id), None
+        )
+        if not account or account.user_id != self.current_user.user_id:
+            messagebox.showerror("Ошибка", "Счет не найден или не принадлежит вам!")
+            return
+
+        limits = self.bank.get_limits(account_id)
+        if limits is None:
+            messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
+            return
+
+        limit_info = (
+            f"Дневной лимит на снятие: {limits['daily_withdrawal'] or 'не установлен'}\n"
+            f"Месячный лимит на снятие: {limits['monthly_withdrawal'] or 'не установлен'}\n"
+            f"Дневной лимит на переводы: {limits['daily_transfer'] or 'не установлен'}\n"
+            f"Месячный лимит на переводы: {limits['monthly_transfer'] or 'не установлен'}\n\n"
+            f"Потрачено сегодня: {limits['daily_spent']:.2f} руб.\n"
+            f"Потрачено в этом месяце: {limits['monthly_spent']:.2f} руб."
+        )
+
+        messagebox.showinfo(f"Лимиты счета {account_id}", limit_info)
 
 
 if __name__ == "__main__":

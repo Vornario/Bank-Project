@@ -5,3 +5,12 @@ class Account:
         self.currency = currency
         self.balance = balance
         self.transaction_history = []
+        self.limits = {
+            "daily_withdrawal": None,
+            "monthly_withdrawal": None,
+            "daily_transfer": None,
+            "monthly_transfer": None,
+            "daily_spent": 0,
+            "monthly_spent": 0,
+            "last_reset_date": None,
+        }
