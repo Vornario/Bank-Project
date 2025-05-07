@@ -36,7 +36,6 @@ class BankingApp:
         self.app.mainloop()
 
     def _show_frame(self, page_name):
-        """Переключение между фреймами"""
         self.register_frame.grid_forget()
         self.login_frame.grid_forget()
         self.main_menu_frame.grid_forget()
@@ -49,7 +48,6 @@ class BankingApp:
             self.main_menu_frame.grid(row=0, column=0, sticky="nsew")
 
     def _create_register_frame(self):
-        """Фрейм регистрации"""
         center_frame = ctk.CTkFrame(self.register_frame, fg_color="#FFFFF1")
         center_frame.pack(expand=True, fill="both", padx=50, pady=20)
 
@@ -93,7 +91,6 @@ class BankingApp:
         ).pack(pady=5, fill="x")
 
     def _create_login_frame(self):
-        """Фрейм входа"""
         center_frame = ctk.CTkFrame(self.login_frame, fg_color="#FFFFF1")
         center_frame.pack(expand=True, fill="both", padx=50, pady=20)
 
@@ -132,7 +129,6 @@ class BankingApp:
         ).pack(pady=5, fill="x")
 
     def _create_main_menu_frame(self):
-        """Главное меню"""
         center_frame = ctk.CTkFrame(self.main_menu_frame, fg_color="#FFFFF1")
         center_frame.pack(expand=True, fill="both", padx=50, pady=20)
 
@@ -169,7 +165,6 @@ class BankingApp:
         ).pack(pady=20, fill="x")
 
     def _register_user(self):
-        """Регистрация пользователя"""
         name = self.reg_name.get().strip()
         email = self.reg_email.get().strip()
         password = self.reg_password.get().strip()
@@ -178,14 +173,12 @@ class BankingApp:
             messagebox.showerror("Ошибка", "Все поля должны быть заполнены!")
             return
 
-        # Проверяем, есть ли уже пользователь с такой почтой
         if any(user.email == email for user in self.bank.users):
             messagebox.showerror(
                 "Ошибка", "Пользователь с такой почтой уже существует!"
             )
             return
 
-        # Регистрируем пользователя через банковскую систему
         new_user = self.bank.reg_user(name, email, password)
         if new_user:
             messagebox.showinfo("Успех", "Регистрация прошла успешно!")
@@ -193,7 +186,7 @@ class BankingApp:
             self._show_frame("login")
 
     def _login_user(self):
-        """Авторизация пользователя"""
+
         email = self.login_email.get().strip()
         password = self.login_password.get().strip()
 
@@ -201,7 +194,6 @@ class BankingApp:
             messagebox.showerror("Ошибка", "Все поля должны быть заполнены!")
             return
 
-        # Аутентифицируем пользователя через банковскую систему
         user = self.bank.auth_user(email, password)
         if user:
             self.current_user = user
@@ -212,11 +204,10 @@ class BankingApp:
             messagebox.showerror("Ошибка", "Неверный email или пароль!")
 
     def _create_account(self):
-        """Создание счета"""
+
         if not self._check_auth():
             return
 
-        # Создаем счет в рублях (код валюты "RUB")
         account = self.bank.create_account(self.current_user.user_id, "RUB")
         if account:
             messagebox.showinfo("Успех", f"Счет {account.account_id} успешно создан!")
@@ -224,7 +215,6 @@ class BankingApp:
             messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
     def _deposit(self):
-        """Пополнение счета"""
         if not self._check_auth():
             return
 
@@ -248,7 +238,6 @@ class BankingApp:
             messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
     def _withdraw(self):
-        """Снятие средств"""
         if not self._check_auth():
             return
 
@@ -272,7 +261,6 @@ class BankingApp:
             messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
     def _transfer(self):
-        """Перевод средств"""
         if not self._check_auth():
             return
 
@@ -303,11 +291,14 @@ class BankingApp:
             messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
     def _get_balance(self):
-        """Просмотр баланса"""
         if not self._check_auth():
             return
 
-        accounts = [acc for acc in self.bank.accounts if acc.user_id == self.current_user.user_id]
+        accounts = [
+            acc
+            for acc in self.bank.accounts
+            if acc.user_id == self.current_user.user_id
+        ]
         if not accounts:
             messagebox.showinfo("Информация", "У вас нет открытых счетов")
             return
@@ -318,24 +309,20 @@ class BankingApp:
         messagebox.showinfo("Ваши счета", balance_info)
 
     def _logout(self):
-        """Выход из системы"""
         self.current_user = None
         self._show_frame("login")
 
     def _check_auth(self):
-        """Проверка авторизации"""
         if not self.current_user:
             messagebox.showerror("Ошибка", "Необходимо авторизоваться!")
             return False
         return True
 
     def _get_account_id(self, prompt):
-        """Получение ID счета"""
         dialog = ctk.CTkInputDialog(text=prompt, title="Ввод данных")
         return dialog.get_input()
 
     def _get_amount(self, prompt):
-        """Получение суммы"""
         dialog = ctk.CTkInputDialog(text=prompt, title="Ввод суммы")
         try:
             return float(dialog.get_input())
@@ -344,18 +331,15 @@ class BankingApp:
             return None
 
     def _clear_register_fields(self):
-        """Очистка полей регистрации"""
         self.reg_name.delete(0, "end")
         self.reg_email.delete(0, "end")
         self.reg_password.delete(0, "end")
 
     def _clear_login_fields(self):
-        """Очистка полей входа"""
         self.login_email.delete(0, "end")
         self.login_password.delete(0, "end")
 
     def _set_limits(self):
-        """Установка лимитов для счета"""
         if not self._check_auth():
             return
 
@@ -369,7 +353,6 @@ class BankingApp:
             messagebox.showerror("Ошибка", "ID счета должен быть числом!")
             return
 
-        # Проверяем, что счет принадлежит текущему пользователю
         account = next(
             (acc for acc in self.bank.accounts if acc.account_id == account_id), None
         )
@@ -415,7 +398,6 @@ class BankingApp:
         ).pack(pady=20)
 
     def _apply_limits(self, account_id, window):
-        """Применение установленных лимитов"""
         try:
             for limit_type, entry in self.limit_entries.items():
                 value = entry.get().strip()
@@ -427,7 +409,6 @@ class BankingApp:
                         )
                         return
                 else:
-                    # Если поле пустое, устанавливаем None (без лимита)
                     self.bank.set_limit(account_id, limit_type, None)
 
             messagebox.showinfo("Успех", "Лимиты успешно установлены!")
@@ -436,7 +417,6 @@ class BankingApp:
             messagebox.showerror("Ошибка", "Введите корректную сумму!")
 
     def _view_limits(self):
-        """Просмотр установленных лимитов"""
         if not self._check_auth():
             return
 
@@ -450,7 +430,6 @@ class BankingApp:
             messagebox.showerror("Ошибка", "ID счета должен быть числом!")
             return
 
-        # Проверяем, что счет принадлежит текущему пользователю
         account = next(
             (acc for acc in self.bank.accounts if acc.account_id == account_id), None
         )

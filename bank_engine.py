@@ -118,7 +118,6 @@ class Bank:
         return account.transaction_history
 
     def set_limit(self, account_id, limit_type, amount):
-        """Установка лимита для счета"""
         account = next(
             (acc for acc in self.accounts if acc.account_id == account_id), None
         )
@@ -140,7 +139,6 @@ class Bank:
         return True
 
     def _reset_spent_if_needed(self, account):
-        """Сброс счетчиков потраченных сумм при смене дня/месяца"""
         today = datetime.now().date()
 
         if account.limits["last_reset_date"] != today:
@@ -153,7 +151,6 @@ class Bank:
             account.limits["last_reset_date"] = today
 
     def _check_limit(self, account, amount, operation_type):
-        """Проверка лимитов перед операцией"""
         self._reset_spent_if_needed(account)
 
         if operation_type == "withdraw":
@@ -251,7 +248,6 @@ class Bank:
         return True
 
     def get_limits(self, account_id):
-        """Получение текущих лимитов счета"""
         account = next(
             (acc for acc in self.accounts if acc.account_id == account_id), None
         )

@@ -10,4 +10,4 @@ class User:
         self.accounts.append(account)
 
     def authenticate(self, password):
-        return self.password == password #test
+        return self.password == password
