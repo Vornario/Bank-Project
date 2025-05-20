@@ -229,8 +229,17 @@ class Bank:
             )
             return False
 
+        if from_account.currency != to_account.currency:
+            exchange_rate = self._get_exchange_rate(from_account.currency, to_account.currency)
+            if exchange_rate is None:
+                self.error_handler.add_error("Ошибка: невозможен перевод между выбранными валютами")
+                return False
+            converted_amount = amount * exchange_rate
+        else:
+            converted_amount = amount
+
         from_account.balance -= amount
-        to_account.balance += amount
+        to_account.balance += converted_amount
         from_account.limits["daily_spent"] += amount
         from_account.limits["monthly_spent"] += amount
 
@@ -241,11 +250,15 @@ class Bank:
             amount,
             "transfer",
             datetime.now(),
+            from_account.currency,
+            to_account.currency,
+            exchange_rate if from_account.currency != to_account.currency else None
         )
         self.transactions.append(transaction)
         from_account.transaction_history.append(transaction)
         to_account.transaction_history.append(transaction)
         return True
+
 
     def get_limits(self, account_id):
         account = next(
@@ -255,3 +268,29 @@ class Bank:
             self.error_handler.add_error("Ошибка: счет не найден")
             return None
         return account.limits
+    
+    def get_account_currency(self, account_id):
+        account = next((acc for acc in self.accounts if acc.account_id == account_id), None)
+        if not account:
+            self.error_handler.add_error("Ошибка: счет не найден")
+            return None
+        return account.currency
+    
+    def convert_currency(self, account_id, new_currency, exchange_rate):
+        account = next((acc for acc in self.accounts if acc.account_id == account_id), None)
+        if not account:
+            self.error_handler.add_error("Ошибка: счет не найден")
+            return False
+        account.convert_currency(new_currency, exchange_rate)
+        return True
+    
+    
+    def _get_exchange_rate(self, from_currency, to_currency):
+        exchange_rates = {
+            'RUB': {'USD': 0.011, 'CNY': 0.079, 'GBP': 0.0087, 'EUR': 0.010},
+            'USD': {'RUB': 90.0, 'CNY': 7.2, 'GBP': 0.79, 'EUR': 0.92},
+            'CNY': {'RUB': 12.6, 'USD': 0.14, 'GBP': 0.11, 'EUR': 0.13},
+            'GBP': {'RUB': 114.5, 'USD': 1.27, 'CNY': 9.1, 'EUR': 1.17},
+            'EUR': {'RUB': 98.0, 'USD': 1.09, 'CNY': 7.8, 'GBP': 0.86}
+        }
+        return exchange_rates.get(from_currency, {}).get(to_currency)

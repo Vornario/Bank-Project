@@ -14,3 +14,7 @@ class Account:
             "monthly_spent": 0,
             "last_reset_date": None,
         }
+        
+    def convert_currency(self, new_currency, exchange_rate):
+        self.balance *= exchange_rate
+        self.currency = new_currency

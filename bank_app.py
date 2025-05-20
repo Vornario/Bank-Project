@@ -27,6 +27,14 @@ class BankingApp:
         self.login_frame = ctk.CTkFrame(self.container, fg_color="#FFFFF1")
         self.main_menu_frame = ctk.CTkFrame(self.container, fg_color="#FFFFF1")
 
+        self.exchange_rates = {
+            "RUB": {"USD": 0.011, "CNY": 0.079, "GBP": 0.0087, "EUR": 0.010},
+            "USD": {"RUB": 90.0, "CNY": 7.2, "GBP": 0.79, "EUR": 0.92},
+            "CNY": {"RUB": 12.6, "USD": 0.14, "GBP": 0.11, "EUR": 0.13},
+            "GBP": {"RUB": 114.5, "USD": 1.27, "CNY": 9.1, "EUR": 1.17},
+            "EUR": {"RUB": 98.0, "USD": 1.09, "CNY": 7.8, "GBP": 0.86},
+        }
+
         self._create_register_frame()
         self._create_login_frame()
         self._create_main_menu_frame()
@@ -141,6 +149,9 @@ class BankingApp:
             ("Снять средства", self._withdraw),
             ("Перевести средства", self._transfer),
             ("Просмотреть баланс", self._get_balance),
+            ("История операций", self._view_transaction_history),
+            ("Изменить валюту счета", self._change_currency),
+            ("Курсы валют", self._view_exchange_rates),
             ("Установить лимиты", self._set_limits),
             ("Просмотреть лимиты", self._view_limits),
         ]
@@ -204,13 +215,50 @@ class BankingApp:
             messagebox.showerror("Ошибка", "Неверный email или пароль!")
 
     def _create_account(self):
-
         if not self._check_auth():
             return
 
-        account = self.bank.create_account(self.current_user.user_id, "RUB")
+        currency_window = ctk.CTkToplevel(self.app)
+        currency_window.title("Выбор валюты счета")
+        currency_window.geometry("300x300")
+
+        ctk.CTkLabel(
+            currency_window,
+            text="Выберите валюту счета:",
+            font=self.title_font,
+        ).pack(pady=10)
+
+        currencies = ["RUB", "USD", "EUR", "GBP", "CNY"]
+        self.account_currency_var = ctk.StringVar(value="RUB")
+
+        for currency in currencies:
+            ctk.CTkRadioButton(
+                currency_window,
+                text=currency,
+                variable=self.account_currency_var,
+                value=currency,
+                font=self.font_style,
+            ).pack(pady=2)
+
+        ctk.CTkButton(
+            currency_window,
+            text="Создать счет",
+            font=self.font_style,
+            fg_color=self.button_color,
+            hover_color=self.button_hover_color,
+            command=lambda: self._finish_account_creation(currency_window),
+        ).pack(pady=20)
+
+    def _finish_account_creation(self, window):
+        currency = self.account_currency_var.get()
+        account = self.bank.create_account(self.current_user.user_id, currency)
+        window.destroy()
+
         if account:
-            messagebox.showinfo("Успех", f"Счет {account.account_id} успешно создан!")
+            messagebox.showinfo(
+                "Успех",
+                f"Счет {account.account_id} в валюте {currency} успешно создан!",
+            )
         else:
             messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
@@ -264,17 +312,17 @@ class BankingApp:
         if not self._check_auth():
             return
 
-        from_account = self._get_account_id("Введите ID вашего счета:")
-        if not from_account:
+        from_account_id = self._get_account_id("Введите ID вашего счета:")
+        if not from_account_id:
             return
 
-        to_account = self._get_account_id("Введите ID счета получателя:")
-        if not to_account:
+        to_account_id = self._get_account_id("Введите ID счета получателя:")
+        if not to_account_id:
             return
 
         try:
-            from_account = int(from_account)
-            to_account = int(to_account)
+            from_account_id = int(from_account_id)
+            to_account_id = int(to_account_id)
         except ValueError:
             messagebox.showerror("Ошибка", "ID счета должен быть числом!")
             return
@@ -283,10 +331,41 @@ class BankingApp:
         if amount is None:
             return
 
-        if self.bank.transfer(from_account, to_account, amount):
-            messagebox.showinfo(
-                "Успех", f"Перевод {amount} руб. на счет {to_account} выполнен!"
+        # Получаем информацию о валютах счетов
+        from_currency = self.bank.get_account_currency(from_account_id)
+        to_currency = self.bank.get_account_currency(to_account_id)
+
+        if from_currency is None or to_currency is None:
+            messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
+            return
+
+        # Если валюты разные, показываем информацию о конвертации
+        if from_currency != to_currency:
+            exchange_rate = self.exchange_rates.get(from_currency, {}).get(to_currency)
+            if exchange_rate is None:
+                messagebox.showerror(
+                    "Ошибка", "Невозможно выполнить перевод между этими валютами"
+                )
+                return
+
+            converted_amount = amount * exchange_rate
+            confirm = messagebox.askyesno(
+                "Подтверждение перевода",
+                f"Вы переводите {amount:.2f} {from_currency} на счет в {to_currency}\n"
+                f"Курс обмена: 1 {from_currency} = {exchange_rate:.4f} {to_currency}\n"
+                f"Получатель получит: {converted_amount:.2f} {to_currency}\n\n"
+                "Продолжить перевод?",
             )
+            if not confirm:
+                return
+
+        if self.bank.transfer(from_account_id, to_account_id, amount):
+            message = f"Перевод {amount:.2f} {from_currency} на счет {to_account_id} выполнен!"
+            if from_currency != to_currency:
+                message += (
+                    f"\nПолучателю зачислено: {converted_amount:.2f} {to_currency}"
+                )
+            messagebox.showinfo("Успех", message)
         else:
             messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
 
@@ -304,7 +383,10 @@ class BankingApp:
             return
 
         balance_info = "\n".join(
-            [f"Счет {acc.account_id}: {acc.balance:.2f} руб." for acc in accounts]
+            [
+                f"Счет {acc.account_id}: {acc.balance:.2f} {acc.currency}"
+                for acc in accounts
+            ]
         )
         messagebox.showinfo("Ваши счета", balance_info)
 
@@ -452,6 +534,177 @@ class BankingApp:
         )
 
         messagebox.showinfo(f"Лимиты счета {account_id}", limit_info)
+
+    def _view_transaction_history(self):
+        if not self._check_auth():
+            return
+
+        account_id = self._get_account_id("Введите ID счета для просмотра истории:")
+        if not account_id:
+            return
+
+        try:
+            account_id = int(account_id)
+        except ValueError:
+            messagebox.showerror("Ошибка", "ID счета должен быть числом!")
+            return
+
+        history = self.bank.get_transaction_history(account_id)
+        if history is None:
+            messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
+            return
+
+        if not history:
+            messagebox.showinfo("История операций", "По этому счету нет операций")
+            return
+
+        history_text = "История операций:\n\n"
+        for transaction in history:
+            if transaction.transaction_type == "deposit":
+                history_text += (
+                    f"{transaction.date.strftime('%Y-%m-%d %H:%M')} | "
+                    f"Пополнение: +{transaction.amount:.2f} {transaction.currency_to}\n"
+                )
+            elif transaction.transaction_type == "withdraw":
+                history_text += (
+                    f"{transaction.date.strftime('%Y-%m-%d %H:%M')} | "
+                    f"Снятие: -{transaction.amount:.2f} {transaction.currency_from}\n"
+                )
+            elif transaction.transaction_type == "transfer":
+                if transaction.account_from == account_id:
+                    if transaction.currency_from != transaction.currency_to:
+                        history_text += (
+                            f"{transaction.date.strftime('%Y-%m-%d %H:%M')} | "
+                            f"Перевод на счет {transaction.account_to}: -{transaction.amount:.2f} {transaction.currency_from} "
+                            f"(конвертировано по курсу {transaction.exchange_rate:.4f} -> "
+                            f"{transaction.amount * transaction.exchange_rate:.2f} {transaction.currency_to})\n"
+                        )
+                    else:
+                        history_text += (
+                            f"{transaction.date.strftime('%Y-%m-%d %H:%M')} | "
+                            f"Перевод на счет {transaction.account_to}: -{transaction.amount:.2f} {transaction.currency_from}\n"
+                        )
+                else:
+                    if transaction.currency_from != transaction.currency_to:
+                        history_text += (
+                            f"{transaction.date.strftime('%Y-%m-%d %H:%M')} | "
+                            f"Перевод со счета {transaction.account_from}: +{transaction.amount * transaction.exchange_rate:.2f} {transaction.currency_to} "
+                            f"(конвертировано из {transaction.amount:.2f} {transaction.currency_from} "
+                            f"по курсу {transaction.exchange_rate:.4f})\n"
+                        )
+                    else:
+                        history_text += (
+                            f"{transaction.date.strftime('%Y-%m-%d %H:%M')} | "
+                            f"Перевод со счета {transaction.account_from}: +{transaction.amount:.2f} {transaction.currency_from}\n"
+                        )
+
+        messagebox.showinfo(f"История операций счета {account_id}", history_text)
+
+    def _change_currency(self):
+        if not self._check_auth():
+            return
+
+        account_id = self._get_account_id("Введите ID счета для изменения валюты:")
+        if not account_id:
+            return
+
+        try:
+            account_id = int(account_id)
+        except ValueError:
+            messagebox.showerror("Ошибка", "ID счета должен быть числом!")
+            return
+
+        current_currency = self.bank.get_account_currency(account_id)
+        if not current_currency:
+            messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
+            return
+
+        currency_window = ctk.CTkToplevel(self.app)
+        currency_window.title("Изменение валюты счета")
+        currency_window.geometry("300x300")
+
+        ctk.CTkLabel(
+            currency_window,
+            text=f"Текущая валюта: {current_currency}",
+            font=self.title_font,
+        ).pack(pady=10)
+
+        ctk.CTkLabel(
+            currency_window,
+            text="Выберите новую валюту:",
+            font=self.font_style,
+        ).pack(pady=5)
+
+        currencies = ["USD", "EUR", "GBP", "CNY", "RUB"]
+        self.new_currency_var = ctk.StringVar(value=current_currency)
+
+        for currency in currencies:
+            if currency != current_currency:
+                ctk.CTkRadioButton(
+                    currency_window,
+                    text=currency,
+                    variable=self.new_currency_var,
+                    value=currency,
+                    font=self.font_style,
+                ).pack(pady=2)
+
+        ctk.CTkButton(
+            currency_window,
+            text="Изменить валюту",
+            font=self.font_style,
+            fg_color=self.button_color,
+            hover_color=self.button_hover_color,
+            command=lambda: self._apply_currency_change(
+                account_id, current_currency, currency_window
+            ),
+        ).pack(pady=20)
+
+    def _apply_currency_change(self, account_id, current_currency, window):
+        new_currency = self.new_currency_var.get()
+
+        if new_currency == current_currency:
+            messagebox.showinfo("Информация", "Валюта не изменена")
+            window.destroy()
+            return
+
+        try:
+            exchange_rate = self.exchange_rates[current_currency][new_currency]
+            if self.bank.convert_currency(account_id, new_currency, exchange_rate):
+                messagebox.showinfo(
+                    "Успех",
+                    f"Валюта счета изменена на {new_currency}\n"
+                    f"Курс обмена: 1 {current_currency} = {exchange_rate:.4f} {new_currency}",
+                )
+                window.destroy()
+            else:
+                messagebox.showerror("Ошибка", self.bank.error_handler.errors[-1])
+        except KeyError:
+            messagebox.showerror(
+                "Ошибка", "Не удалось найти курс обмена для выбранных валют"
+            )
+
+    def _view_exchange_rates(self):
+        rates_info = "Текущие курсы валют:\n\n"
+        currencies = ["RUB", "USD", "EUR", "GBP", "CNY"]
+
+        # Создаем заголовок таблицы
+        rates_info += "{:8}".format("")
+        for to_curr in currencies:
+            rates_info += "{:8}".format(to_curr)
+        rates_info += "\n"
+
+        # Заполняем таблицу курсов
+        for from_curr in currencies:
+            rates_info += "{:8}".format(from_curr)
+            for to_curr in currencies:
+                if from_curr == to_curr:
+                    rate = 1.0
+                else:
+                    rate = self.exchange_rates.get(from_curr, {}).get(to_curr, 0)
+                rates_info += "{:8.4f}".format(rate)
+            rates_info += "\n"
+
+        messagebox.showinfo("Курсы валют", rates_info)
 
 
 if __name__ == "__main__":
